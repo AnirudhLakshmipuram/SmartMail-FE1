@@ -28,6 +28,15 @@ export interface AutoReplyRule {
   created_at: string;
 }
 
+export interface MonitoringStats {
+  emails_processed_today: number;
+  auto_replies_sent_today: number;
+  average_response_time_ms: number;
+  last_activity: string;
+  monitoring_status: 'active' | 'paused' | 'error';
+  uptime_percentage: number;
+}
+
 export class MailboxApiService extends BaseApiService {
   async getMailboxConfig(): Promise<{ success: boolean; data?: MailboxConfig; error?: string }> {
     try {
@@ -89,6 +98,64 @@ export class MailboxApiService extends BaseApiService {
       }
       
       return { success: false, error: response.data.error?.message || 'Connection test failed' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  // Monitoring APIs
+  async getMonitoringStats(): Promise<{ success: boolean; data?: MonitoringStats; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<MonitoringStats>> = await this.axiosInstance.get('/mailbox/monitoring/stats');
+      
+      if (response.data.success && response.data.data) {
+        return { success: true, data: response.data.data };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to fetch monitoring stats' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  async startMonitoring(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post('/mailbox/monitoring/start');
+      
+      if (response.data.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to start monitoring' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  async stopMonitoring(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post('/mailbox/monitoring/stop');
+      
+      if (response.data.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to stop monitoring' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  async getMonitoringStatus(): Promise<{ success: boolean; data?: { status: 'active' | 'paused' | 'error'; uptime: number }; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ status: 'active' | 'paused' | 'error'; uptime: number }>> = 
+        await this.axiosInstance.get('/mailbox/monitoring/status');
+      
+      if (response.data.success && response.data.data) {
+        return { success: true, data: response.data.data };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to fetch monitoring status' };
     } catch (error) {
       return { success: false, error: this.handleApiError(error) };
     }
@@ -162,6 +229,66 @@ export class MailboxApiService extends BaseApiService {
       }
       
       return { success: false, error: response.data.error?.message || 'Failed to toggle auto-reply rule' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  // Email Processing Control
+  async pauseEmailProcessing(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post('/mailbox/processing/pause');
+      
+      if (response.data.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to pause email processing' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  async resumeEmailProcessing(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post('/mailbox/processing/resume');
+      
+      if (response.data.success) {
+        return { success: true };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to resume email processing' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  // Sync and Health Check
+  async syncMailbox(): Promise<{ success: boolean; data?: { synced_emails: number; processing_time_ms: number }; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ synced_emails: number; processing_time_ms: number }>> = 
+        await this.axiosInstance.post('/mailbox/sync');
+      
+      if (response.data.success && response.data.data) {
+        return { success: true, data: response.data.data };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to sync mailbox' };
+    } catch (error) {
+      return { success: false, error: this.handleApiError(error) };
+    }
+  }
+
+  async healthCheck(): Promise<{ success: boolean; data?: { status: string; last_check: string; issues: string[] }; error?: string }> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ status: string; last_check: string; issues: string[] }>> = 
+        await this.axiosInstance.get('/mailbox/health');
+      
+      if (response.data.success && response.data.data) {
+        return { success: true, data: response.data.data };
+      }
+      
+      return { success: false, error: response.data.error?.message || 'Failed to perform health check' };
     } catch (error) {
       return { success: false, error: this.handleApiError(error) };
     }

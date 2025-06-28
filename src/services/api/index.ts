@@ -18,7 +18,7 @@ export { analyticsApi } from './analytics';
 export type { AuthResponse } from './auth';
 export type { DocumentsParams } from './documents';
 export type { EmailsParams, AIResponseData, SendReplyData } from './emails';
-export type { MailboxConnectionTest, AutoReplyRule } from './mailbox';
+export type { MailboxConnectionTest, AutoReplyRule, MonitoringStats } from './mailbox';
 export type { LogsParams, DashboardAnalytics } from './analytics';
 export type { ApiResponse, PaginatedResponse } from './base';
 
@@ -61,11 +61,27 @@ class ApiService {
   updateMailboxConfig = mailboxApi.updateMailboxConfig.bind(mailboxApi);
   configureMailbox = mailboxApi.configureMailbox.bind(mailboxApi);
   testMailboxConnection = mailboxApi.testMailboxConnection.bind(mailboxApi);
+  
+  // Monitoring
+  getMonitoringStats = mailboxApi.getMonitoringStats.bind(mailboxApi);
+  startMonitoring = mailboxApi.startMonitoring.bind(mailboxApi);
+  stopMonitoring = mailboxApi.stopMonitoring.bind(mailboxApi);
+  getMonitoringStatus = mailboxApi.getMonitoringStatus.bind(mailboxApi);
+  
+  // Auto-Reply Rules
   getAutoReplyRules = mailboxApi.getAutoReplyRules.bind(mailboxApi);
   createAutoReplyRule = mailboxApi.createAutoReplyRule.bind(mailboxApi);
   updateAutoReplyRule = mailboxApi.updateAutoReplyRule.bind(mailboxApi);
   deleteAutoReplyRule = mailboxApi.deleteAutoReplyRule.bind(mailboxApi);
   toggleAutoReplyRule = mailboxApi.toggleAutoReplyRule.bind(mailboxApi);
+  
+  // Email Processing Control
+  pauseEmailProcessing = mailboxApi.pauseEmailProcessing.bind(mailboxApi);
+  resumeEmailProcessing = mailboxApi.resumeEmailProcessing.bind(mailboxApi);
+  
+  // Sync and Health
+  syncMailbox = mailboxApi.syncMailbox.bind(mailboxApi);
+  healthCheck = mailboxApi.healthCheck.bind(mailboxApi);
 
   // Analytics & Logs
   getLogs = analyticsApi.getLogs.bind(analyticsApi);
