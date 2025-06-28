@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -13,7 +13,6 @@ import {
   Eye,
   Tag,
   Trash2,
-  Plus,
   RefreshCw
 } from 'lucide-react';
 
@@ -27,11 +26,17 @@ interface UploadFile {
 }
 
 export const UploadData: React.FC = () => {
-  const { categories, documents, loading, error, addDocument, deleteDocument, refreshData } = useApp();
+  const { categories, documents, loading, error, addDocument, deleteDocument, loadPageData } = useApp();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load upload page data when component mounts
+  useEffect(() => {
+    console.log('📁 Upload page mounted - loading categories and documents');
+    loadPageData('upload');
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -136,7 +141,7 @@ export const UploadData: React.FC = () => {
     return (
       <Layout title="Upload Data" subtitle="Upload company documents to enhance AI knowledge base">
         <div className="flex items-center justify-center h-64">
-          <LoadingSpinner size="lg" text="Loading..." />
+          <LoadingSpinner size="lg" text="Loading upload page..." />
         </div>
       </Layout>
     );
@@ -148,7 +153,7 @@ export const UploadData: React.FC = () => {
       <Layout title="Upload Data" subtitle="Upload company documents to enhance AI knowledge base">
         <ErrorMessage 
           message={errorMessage || 'Failed to load data'} 
-          onRetry={refreshData}
+          onRetry={() => loadPageData('upload')}
         />
       </Layout>
     );
@@ -157,6 +162,22 @@ export const UploadData: React.FC = () => {
   return (
     <Layout title="Upload Data" subtitle="Upload company documents to enhance AI knowledge base">
       <div className="space-y-4 sm:space-y-6">
+        {/* Header with Refresh Button */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Document Management</h2>
+            <p className="text-sm sm:text-base text-gray-600">Upload and organize your company documents</p>
+          </div>
+          <button
+            onClick={() => loadPageData('upload')}
+            disabled={loading.categories || loading.documents}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${(loading.categories || loading.documents) ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+
         {/* Upload Area */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
           <div
@@ -293,13 +314,6 @@ export const UploadData: React.FC = () => {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">Uploaded Documents</h3>
               <p className="text-sm text-gray-500">{documents.length} documents</p>
             </div>
-            <button
-              onClick={refreshData}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
-            </button>
           </div>
 
           {documents.length > 0 ? (

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../Layout/Layout';
 import { MailboxSetup } from './MailboxSetup';
 import { InboxView } from './InboxView';
+import { useApp } from '../../contexts/AppContext';
 import { 
   Mail, 
   Settings, 
@@ -9,9 +10,6 @@ import {
   Send,
   Archive,
   Trash2,
-  Star,
-  Tag,
-  Filter,
   BarChart3
 } from 'lucide-react';
 
@@ -20,6 +18,13 @@ type MailboxTab = 'setup' | 'inbox' | 'sent' | 'archive' | 'trash' | 'analytics'
 export const Mailbox: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MailboxTab>('setup');
   const [emailConfig, setEmailConfig] = useState<{ email: string; appPassword: string } | null>(null);
+  const { loadPageData } = useApp();
+
+  // Load mailbox page data when component mounts
+  useEffect(() => {
+    console.log('📧 Mailbox page mounted - loading mailbox data');
+    loadPageData('mailbox');
+  }, []);
 
   const handleConfigured = (config: { email: string; appPassword: string }) => {
     setEmailConfig(config);

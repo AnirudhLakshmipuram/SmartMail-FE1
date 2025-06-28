@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
-import { Settings, Plus, Trash2, Mail, Sliders, ToggleLeft as Toggle, Save, AlertCircle, CheckCircle, Target, X } from 'lucide-react';
+import { LoadingSpinner } from '../common/LoadingSpinner';
+import { ErrorMessage } from '../common/ErrorMessage';
+import { Settings, Plus, Trash2, Mail, Sliders, Save, AlertCircle, CheckCircle, Target, X, RefreshCw } from 'lucide-react';
 import { MailboxConfig as MailboxConfigType } from '../../types';
 
 interface AutoReplyRule {
@@ -19,7 +21,7 @@ interface CategoryConfig {
 }
 
 export const MailboxConfig: React.FC = () => {
-  const { categories, mailboxConfig, updateMailboxConfig } = useApp();
+  const { categories, mailboxConfig, loading, error, updateMailboxConfig, loadPageData } = useApp();
   
   const [config, setConfig] = useState<MailboxConfigType>({
     email: mailboxConfig?.email || '',
@@ -34,23 +36,52 @@ export const MailboxConfig: React.FC = () => {
     { id: '2', email: 'sales@company.com', enabled: false },
   ]);
 
-  const [categoryConfigs, setCategoryConfigs] = useState<CategoryConfig[]>(
-    categories.map(cat => ({
-      id: cat.id,
-      name: cat.name,
-      enabled: true,
-      keywords: ['billing', 'payment', 'invoice'],
-      template: cat.template
-    }))
-  );
+  const [categoryConfigs, setCategoryConfigs] = useState<CategoryConfig[]>([]);
 
   const [newEmail, setNewEmail] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
-  const handleSaveConfig = () => {
-    updateMailboxConfig(config);
-    // Show success message
+  // Load mailbox config page data when component mounts
+  useEffect(() => {
+    console.log('⚙️ Mailbox Config page mounted - loading categories and config');
+    loadPageData('mailbox-config');
+  }, []);
+
+  // Update category configs when categories are loaded
+  useEffect(() => {
+    if (categories.length > 0) {
+      setCategoryConfigs(
+        categories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          enabled: true,
+          keywords: ['billing', 'payment', 'invoice'],
+          template: cat.template
+        }))
+      );
+    }
+  }, [categories]);
+
+  // Update config when mailboxConfig is loaded
+  useEffect(() => {
+    if (mailboxConfig) {
+      setConfig({
+        email: mailboxConfig.email || '',
+        appPassword: mailboxConfig.appPassword || '',
+        autoReplyEmails: mailboxConfig.autoReplyEmails || [],
+        confidenceThreshold: mailboxConfig.confidenceThreshold || 0.8,
+        enabled: mailboxConfig.enabled || false
+      });
+    }
+  }, [mailboxConfig]);
+
+  const handleSaveConfig = async () => {
+    const success = await updateMailboxConfig(config);
+    if (success) {
+      // Show success message
+      console.log('✅ Mailbox configuration saved successfully');
+    }
   };
 
   const addAutoReplyEmail = () => {
@@ -100,9 +131,47 @@ export const MailboxConfig: React.FC = () => {
     ));
   };
 
+  if (loading.categories || loading.mailboxConfig) {
+    return (
+      <Layout title="Mailbox Configuration" subtitle="Configure auto-reply settings and email rules">
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner size="lg" text="Loading mailbox configuration..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error.categories || error.mailboxConfig) {
+    const errorMessage = error.categories || error.mailboxConfig;
+    return (
+      <Layout title="Mailbox Configuration" subtitle="Configure auto-reply settings and email rules">
+        <ErrorMessage 
+          message={errorMessage || 'Failed to load configuration'} 
+          onRetry={() => loadPageData('mailbox-config')}
+        />
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="Mailbox Configuration" subtitle="Configure auto-reply settings and email rules">
       <div className="space-y-6">
+        {/* Header with Refresh Button */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Auto-Reply Configuration</h2>
+            <p className="text-sm sm:text-base text-gray-600">Manage automated email response settings</p>
+          </div>
+          <button
+            onClick={() => loadPageData('mailbox-config')}
+            disabled={loading.categories || loading.mailboxConfig}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${(loading.categories || loading.mailboxConfig) ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+
         {/* Global Settings */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">

@@ -11,15 +11,13 @@ import {
   MessageSquare,
   Palette,
   FileText,
-  Save,
   X,
-  RefreshCw,
-  Play
+  RefreshCw
 } from 'lucide-react';
 import { Category } from '../../types';
 
 export const Configuration: React.FC = () => {
-  const { categories, loading, error, addCategory, updateCategory, deleteCategory, loadCategories } = useApp();
+  const { categories, loading, error, addCategory, updateCategory, deleteCategory, loadPageData } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,9 +30,10 @@ export const Configuration: React.FC = () => {
     color: 'bg-blue-500',
   });
 
-  // Load categories when component mounts
+  // Load configuration page data when component mounts
   useEffect(() => {
-    loadCategories();
+    console.log('⚙️ Configuration page mounted - loading categories');
+    loadPageData('configuration');
   }, []);
 
   const toneOptions = [
@@ -120,12 +119,12 @@ export const Configuration: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
             <button
-              onClick={loadCategories}
+              onClick={() => loadPageData('configuration')}
               disabled={loading.categories}
               className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
             >
-              {loading.categories ? <LoadingSpinner size="sm" /> : <Play className="h-4 w-4" />}
-              <span>Load Categories</span>
+              {loading.categories ? <LoadingSpinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
+              <span>Refresh Categories</span>
             </button>
             <button
               onClick={() => openModal()}
@@ -141,7 +140,7 @@ export const Configuration: React.FC = () => {
         {error.categories && (
           <ErrorMessage 
             message={error.categories} 
-            onRetry={loadCategories}
+            onRetry={() => loadPageData('configuration')}
           />
         )}
 
@@ -216,7 +215,7 @@ export const Configuration: React.FC = () => {
             <p className="text-sm sm:text-base text-gray-600 mb-6">Load categories from the API or create your first category</p>
             <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
               <button
-                onClick={loadCategories}
+                onClick={() => loadPageData('configuration')}
                 className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
               >
                 Load Categories

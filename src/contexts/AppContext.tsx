@@ -22,6 +22,8 @@ interface AppContextType {
     mailboxConfig: string | null;
     logs: string | null;
   };
+  // Page-specific load functions
+  loadPageData: (page: 'dashboard' | 'configuration' | 'upload' | 'mailbox' | 'mailbox-config' | 'logs') => Promise<void>;
   // Manual trigger functions
   loadCategories: () => Promise<void>;
   loadDocuments: () => Promise<void>;
@@ -73,8 +75,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logs: null as string | null,
   });
 
-  // Manual data loading functions
+  // Page-specific data loading
+  const loadPageData = async (page: 'dashboard' | 'configuration' | 'upload' | 'mailbox' | 'mailbox-config' | 'logs') => {
+    console.log(`🔄 Loading data for page: ${page}`);
+    
+    switch (page) {
+      case 'dashboard':
+        // Dashboard needs overview data from all APIs
+        await Promise.all([
+          loadCategories(),
+          loadDocuments(),
+          loadEmails(),
+          loadLogs()
+        ]);
+        break;
+        
+      case 'configuration':
+        // Configuration page only needs categories
+        await loadCategories();
+        break;
+        
+      case 'upload':
+        // Upload page needs categories (for assignment) and documents (to show existing)
+        await Promise.all([
+          loadCategories(),
+          loadDocuments()
+        ]);
+        break;
+        
+      case 'mailbox':
+        // Mailbox page needs mailbox config and emails
+        await Promise.all([
+          loadMailboxConfig(),
+          loadEmails()
+        ]);
+        break;
+        
+      case 'mailbox-config':
+        // Mailbox config page needs categories and mailbox config
+        await Promise.all([
+          loadCategories(),
+          loadMailboxConfig()
+        ]);
+        break;
+        
+      case 'logs':
+        // Logs page only needs logs
+        await loadLogs();
+        break;
+        
+      default:
+        console.warn(`Unknown page: ${page}`);
+    }
+  };
+
+  // Individual data loading functions
   const loadCategories = async () => {
+    if (loading.categories) return; // Prevent duplicate calls
+    
     setLoading(prev => ({ ...prev, categories: true }));
     setError(prev => ({ ...prev, categories: null }));
     
@@ -82,6 +140,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await apiService.getCategories();
       if (response.success && response.data) {
         setCategories(response.data);
+        console.log(`✅ Loaded ${response.data.length} categories`);
       } else {
         setError(prev => ({ ...prev, categories: response.error || 'Failed to load categories' }));
       }
@@ -93,6 +152,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loadDocuments = async () => {
+    if (loading.documents) return; // Prevent duplicate calls
+    
     setLoading(prev => ({ ...prev, documents: true }));
     setError(prev => ({ ...prev, documents: null }));
     
@@ -100,6 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await apiService.getDocuments();
       if (response.success && response.data) {
         setDocuments(response.data);
+        console.log(`✅ Loaded ${response.data.length} documents`);
       } else {
         setError(prev => ({ ...prev, documents: response.error || 'Failed to load documents' }));
       }
@@ -111,6 +173,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loadEmails = async () => {
+    if (loading.emails) return; // Prevent duplicate calls
+    
     setLoading(prev => ({ ...prev, emails: true }));
     setError(prev => ({ ...prev, emails: null }));
     
@@ -118,6 +182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await apiService.getEmails();
       if (response.success && response.data) {
         setEmails(response.data.emails);
+        console.log(`✅ Loaded ${response.data.emails.length} emails`);
       } else {
         setError(prev => ({ ...prev, emails: response.error || 'Failed to load emails' }));
       }
@@ -129,6 +194,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loadMailboxConfig = async () => {
+    if (loading.mailboxConfig) return; // Prevent duplicate calls
+    
     setLoading(prev => ({ ...prev, mailboxConfig: true }));
     setError(prev => ({ ...prev, mailboxConfig: null }));
     
@@ -136,6 +203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await apiService.getMailboxConfig();
       if (response.success && response.data) {
         setMailboxConfig(response.data);
+        console.log(`✅ Loaded mailbox configuration`);
       } else {
         setError(prev => ({ ...prev, mailboxConfig: response.error || 'Failed to load mailbox config' }));
       }
@@ -147,6 +215,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loadLogs = async () => {
+    if (loading.logs) return; // Prevent duplicate calls
+    
     setLoading(prev => ({ ...prev, logs: true }));
     setError(prev => ({ ...prev, logs: null }));
     
@@ -154,6 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const response = await apiService.getLogs();
       if (response.success && response.data) {
         setLogs(response.data.logs);
+        console.log(`✅ Loaded ${response.data.logs.length} logs`);
       } else {
         setError(prev => ({ ...prev, logs: response.error || 'Failed to load logs' }));
       }
@@ -252,6 +323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logs,
       loading,
       error,
+      loadPageData,
       loadCategories,
       loadDocuments,
       loadEmails,

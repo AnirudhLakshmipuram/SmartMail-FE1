@@ -12,8 +12,7 @@ import {
   Clock,
   AlertTriangle,
   Bot,
-  RefreshCw,
-  Play
+  RefreshCw
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -24,19 +23,14 @@ export const Dashboard: React.FC = () => {
     logs, 
     loading, 
     error, 
-    loadCategories,
-    loadDocuments,
-    loadEmails,
-    loadLogs,
+    loadPageData,
     refreshData 
   } = useApp();
 
-  // Load initial data when component mounts
+  // Load dashboard data when component mounts
   useEffect(() => {
-    loadCategories();
-    loadDocuments();
-    loadEmails();
-    loadLogs();
+    console.log('📊 Dashboard mounted - loading page data');
+    loadPageData('dashboard');
   }, []);
 
   const stats = [
@@ -96,30 +90,12 @@ export const Dashboard: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <button
-            onClick={refreshData}
+            onClick={() => loadPageData('dashboard')}
             disabled={isLoading}
             className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh All Data</span>
-          </button>
-          
-          <button
-            onClick={loadEmails}
-            disabled={loading.emails}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-          >
-            <Play className="h-4 w-4" />
-            <span>Load Emails</span>
-          </button>
-          
-          <button
-            onClick={loadCategories}
-            disabled={loading.categories}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
-          >
-            <Settings className="h-4 w-4" />
-            <span>Load Categories</span>
+            <span>Refresh Dashboard</span>
           </button>
         </div>
 
@@ -183,7 +159,7 @@ export const Dashboard: React.FC = () => {
               {error.emails ? (
                 <ErrorMessage 
                   message={error.emails} 
-                  onRetry={loadEmails}
+                  onRetry={() => loadPageData('dashboard')}
                 />
               ) : recentEmails.length > 0 ? (
                 <div className="space-y-3 sm:space-y-4">
@@ -222,12 +198,6 @@ export const Dashboard: React.FC = () => {
                 <div className="text-center py-6 sm:py-8">
                   <Mail className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 text-sm sm:text-base">No emails loaded</p>
-                  <button
-                    onClick={loadEmails}
-                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
-                  >
-                    Click to load emails
-                  </button>
                 </div>
               )}
             </div>
@@ -248,7 +218,7 @@ export const Dashboard: React.FC = () => {
               {error.logs ? (
                 <ErrorMessage 
                   message={error.logs} 
-                  onRetry={loadLogs}
+                  onRetry={() => loadPageData('dashboard')}
                 />
               ) : recentLogs.length > 0 ? (
                 <div className="space-y-3 sm:space-y-4">
@@ -288,12 +258,6 @@ export const Dashboard: React.FC = () => {
                 <div className="text-center py-6 sm:py-8">
                   <FileText className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 text-sm sm:text-base">No logs loaded</p>
-                  <button
-                    onClick={loadLogs}
-                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
-                  >
-                    Click to load logs
-                  </button>
                 </div>
               )}
             </div>
@@ -305,31 +269,31 @@ export const Dashboard: React.FC = () => {
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <button 
-              onClick={loadCategories}
+              onClick={() => loadPageData('configuration')}
               disabled={loading.categories}
               className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all group text-left disabled:opacity-50"
             >
               <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Categories</p>
-              <p className="text-xs sm:text-sm text-gray-500">Fetch email categories from API</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Manage Categories</p>
+              <p className="text-xs sm:text-sm text-gray-500">Configure email categories</p>
             </button>
             <button 
-              onClick={loadDocuments}
+              onClick={() => loadPageData('upload')}
               disabled={loading.documents}
               className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all group text-left disabled:opacity-50"
             >
               <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Documents</p>
-              <p className="text-xs sm:text-sm text-gray-500">Fetch uploaded documents from API</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Upload Documents</p>
+              <p className="text-xs sm:text-sm text-gray-500">Add company knowledge base</p>
             </button>
             <button 
-              onClick={loadEmails}
+              onClick={() => loadPageData('mailbox')}
               disabled={loading.emails}
               className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all group text-left sm:col-span-2 lg:col-span-1 disabled:opacity-50"
             >
               <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Emails</p>
-              <p className="text-xs sm:text-sm text-gray-500">Fetch emails from mailbox API</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Check Mailbox</p>
+              <p className="text-xs sm:text-sm text-gray-500">View and manage emails</p>
             </button>
           </div>
         </div>
