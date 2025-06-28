@@ -5,7 +5,6 @@ import {
   Settings, 
   Upload, 
   Mail, 
-  MailSearch, 
   FileText,
   LogOut,
   Bot,
@@ -20,7 +19,6 @@ const navigationItems = [
   { name: 'Configuration', href: '/configuration', icon: Settings },
   { name: 'Upload Data', href: '/upload', icon: Upload },
   { name: 'Mailbox', href: '/mailbox', icon: Mail },
-  { name: 'Mailbox Config', href: '/mailbox-config', icon: MailSearch },
   { name: 'Logs', href: '/logs', icon: FileText },
 ];
 
