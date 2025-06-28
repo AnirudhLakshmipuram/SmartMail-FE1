@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Bot } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Bot, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, error } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
-    const success = await login(email, password);
-    if (!success) {
-      setError('Invalid credentials. Please try again.');
-    }
+    await login(email, password);
+  };
+
+  const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
   };
 
   return (
@@ -30,6 +29,37 @@ export const Login: React.FC = () => {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
           <p className="text-gray-600 mt-2">Sign in to your AI Email Responder</p>
+        </div>
+
+        {/* Demo Credentials Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">Demo Credentials</h3>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleDemoLogin('demo@company.com', 'demo123')}
+                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left"
+                  >
+                    <div className="font-medium text-blue-900">Demo User</div>
+                    <div className="text-blue-600">demo@company.com</div>
+                  </button>
+                  <button
+                    onClick={() => handleDemoLogin('admin@company.com', 'admin123')}
+                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left"
+                  >
+                    <div className="font-medium text-blue-900">Admin User</div>
+                    <div className="text-blue-600">admin@company.com</div>
+                  </button>
+                </div>
+                <p className="text-xs text-blue-700">
+                  Click any demo account above or use any email with password (min 6 chars)
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Login Form */}
@@ -104,11 +134,6 @@ export const Login: React.FC = () => {
               </p>
             </div>
           </form>
-        </div>
-
-        {/* Demo Info */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Demo: Use any email and password (min 6 characters)</p>
         </div>
       </div>
     </div>
