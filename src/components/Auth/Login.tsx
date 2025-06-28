@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Bot, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -8,15 +8,38 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, error } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await login(email, password);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevent default form submission
+    e.stopPropagation(); // Stop event bubbling
+    
+    try {
+      const success = await login(email, password);
+      if (success) {
+        // Navigate programmatically instead of letting browser handle it
+        navigate('/', { replace: true });
+      }
+      // If login fails, error will be shown via context
+    } catch (err) {
+      console.error('Login error:', err);
+      // Error handling is done in the auth context
+    }
   };
 
-  const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
+  const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
     setEmail(demoEmail);
     setPassword(demoPassword);
+    
+    // Automatically attempt login with demo credentials
+    try {
+      const success = await login(demoEmail, demoPassword);
+      if (success) {
+        navigate('/', { replace: true });
+      }
+    } catch (err) {
+      console.error('Demo login error:', err);
+    }
   };
 
   return (
@@ -40,15 +63,19 @@ export const Login: React.FC = () => {
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <button
+                    type="button"
                     onClick={() => handleDemoLogin('demo@company.com', 'demo123')}
-                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left"
+                    disabled={isLoading}
+                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left disabled:opacity-50"
                   >
                     <div className="font-medium text-blue-900">Demo User</div>
                     <div className="text-blue-600">demo@company.com</div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDemoLogin('admin@company.com', 'admin123')}
-                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left"
+                    disabled={isLoading}
+                    className="text-xs bg-white border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors text-left disabled:opacity-50"
                   >
                     <div className="font-medium text-blue-900">Admin User</div>
                     <div className="text-blue-600">admin@company.com</div>
@@ -64,7 +91,7 @@ export const Login: React.FC = () => {
 
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -76,9 +103,11 @@ export const Login: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  disabled={isLoading}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter your email"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -94,14 +123,17 @@ export const Login: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  disabled={isLoading}
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  disabled={isLoading}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -118,17 +150,27 @@ export const Login: React.FC = () => {
             {/* Login Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !email || !password}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Signing In...</span>
+                </div>
+              ) : (
+                'Sign In'
+              )}
             </button>
 
             {/* Register Link */}
             <div className="text-center">
               <p className="text-gray-600 text-sm">
                 Don't have an account?{' '}
-                <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                <Link 
+                  to="/register" 
+                  className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                >
                   Sign up
                 </Link>
               </p>

@@ -29,18 +29,87 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const AppRoutes: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/configuration" element={<ProtectedRoute><Configuration /></ProtectedRoute>} />
-      <Route path="/upload" element={<ProtectedRoute><UploadData /></ProtectedRoute>} />
-      <Route path="/mailbox" element={<ProtectedRoute><Mailbox /></ProtectedRoute>} />
-      <Route path="/mailbox-config" element={<ProtectedRoute><MailboxConfig /></ProtectedRoute>} />
-      <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
+      {/* Public routes - redirect to dashboard if already logged in */}
+      <Route 
+        path="/login" 
+        element={user ? <Navigate to="/" replace /> : <Login />} 
+      />
+      <Route 
+        path="/register" 
+        element={user ? <Navigate to="/" replace /> : <Register />} 
+      />
+      
+      {/* Protected routes */}
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuration" 
+        element={
+          <ProtectedRoute>
+            <Configuration />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/upload" 
+        element={
+          <ProtectedRoute>
+            <UploadData />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/mailbox" 
+        element={
+          <ProtectedRoute>
+            <Mailbox />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/mailbox-config" 
+        element={
+          <ProtectedRoute>
+            <MailboxConfig />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/logs" 
+        element={
+          <ProtectedRoute>
+            <Logs />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Catch all route - redirect to dashboard if logged in, login if not */}
+      <Route 
+        path="*" 
+        element={<Navigate to={user ? "/" : "/login"} replace />} 
+      />
     </Routes>
   );
 };
