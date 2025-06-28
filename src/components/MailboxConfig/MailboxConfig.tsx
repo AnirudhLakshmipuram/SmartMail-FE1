@@ -3,22 +3,7 @@ import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorMessage } from '../common/ErrorMessage';
-import { 
-  Settings, 
-  Plus, 
-  Trash2, 
-  Mail, 
-  Sliders, 
-  Save, 
-  AlertCircle, 
-  CheckCircle, 
-  Target, 
-  X, 
-  RefreshCw,
-  Toggle,
-  Clock,
-  Calendar
-} from 'lucide-react';
+import { Settings, Plus, Trash2, Mail, Sliders, Save, AlertCircle, CheckCircle, Target, X, RefreshCw, ToggleLeft as Toggle, Clock, Calendar } from 'lucide-react';
 import { MailboxConfig as MailboxConfigType } from '../../types';
 import { apiService } from '../../services/api';
 
