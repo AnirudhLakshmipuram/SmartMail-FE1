@@ -13,6 +13,7 @@ import {
   Wifi,
   Settings
 } from 'lucide-react';
+import { apiService } from '../../services/api';
 
 interface MailboxSetupProps {
   onConfigured: (config: { email: string; appPassword: string }) => void;
@@ -28,6 +29,7 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [connectionMessage, setConnectionMessage] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const validateForm = () => {
@@ -58,26 +60,44 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
     
     setIsConnecting(true);
     setConnectionStatus('testing');
+    setConnectionMessage('Testing connection to Gmail...');
     
     try {
-      // Simulate connection testing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Test the connection first
+      const testResponse = await apiService.testMailboxConnection(formData.email, formData.appPassword);
       
-      // In a real implementation, this would:
-      // 1. Encrypt credentials using AES-256
-      // 2. Test IMAP connection to Gmail
-      // 3. Store encrypted credentials in secure storage
-      // 4. Establish secure session
-      
-      setConnectionStatus('success');
-      setTimeout(() => {
-        onConfigured({
-          email: formData.email,
-          appPassword: formData.appPassword
-        });
-      }, 1000);
+      if (testResponse.success && testResponse.data) {
+        setConnectionStatus('success');
+        setConnectionMessage(`Connection successful! Found ${testResponse.data.inbox_count || 0} emails in inbox.`);
+        
+        // Configure the mailbox
+        const configResponse = await apiService.configureMailbox(
+          formData.email,
+          formData.appPassword,
+          [formData.email], // Default auto-reply emails
+          0.8, // Default confidence threshold
+          true // Enable by default
+        );
+        
+        if (configResponse.success) {
+          setTimeout(() => {
+            onConfigured({
+              email: formData.email,
+              appPassword: formData.appPassword
+            });
+          }, 1000);
+        } else {
+          setConnectionStatus('error');
+          setConnectionMessage(configResponse.error || 'Failed to configure mailbox');
+        }
+      } else {
+        setConnectionStatus('error');
+        setConnectionMessage(testResponse.error || 'Connection test failed');
+      }
     } catch (error) {
       setConnectionStatus('error');
+      setConnectionMessage('Network error. Please check your connection and try again.');
+      console.error('Mailbox connection error:', error);
     } finally {
       setIsConnecting(false);
     }
@@ -138,6 +158,7 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
                     errors.email ? 'border-red-300' : 'border-gray-300'
                   }`}
                   placeholder="your-email@gmail.com"
+                  disabled={isConnecting}
                 />
               </div>
               {errors.email && (
@@ -170,11 +191,13 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
                   }`}
                   placeholder="16-character app password"
                   maxLength={16}
+                  disabled={isConnecting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  disabled={isConnecting}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -200,6 +223,7 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
                   }`}
                   placeholder="Confirm app password"
                   maxLength={16}
+                  disabled={isConnecting}
                 />
               </div>
               {errors.confirmPassword && (
@@ -218,19 +242,19 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
                   {connectionStatus === 'testing' && (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-                      <span className="text-blue-800 text-sm">Testing connection...</span>
+                      <span className="text-blue-800 text-sm">{connectionMessage}</span>
                     </>
                   )}
                   {connectionStatus === 'success' && (
                     <>
                       <CheckCircle className="h-4 w-4 text-green-600 mr-3" />
-                      <span className="text-green-800 text-sm">Connection successful!</span>
+                      <span className="text-green-800 text-sm">{connectionMessage}</span>
                     </>
                   )}
                   {connectionStatus === 'error' && (
                     <>
                       <AlertTriangle className="h-4 w-4 text-red-600 mr-3" />
-                      <span className="text-red-800 text-sm">Connection failed. Please check your credentials.</span>
+                      <span className="text-red-800 text-sm">{connectionMessage}</span>
                     </>
                   )}
                 </div>
@@ -243,7 +267,16 @@ export const MailboxSetup: React.FC<MailboxSetupProps> = ({ onConfigured }) => {
               disabled={isConnecting || connectionStatus === 'success'}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] text-sm sm:text-base"
             >
-              {isConnecting ? 'Connecting...' : connectionStatus === 'success' ? 'Connected' : 'Connect to Gmail'}
+              {isConnecting ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Connecting...</span>
+                </div>
+              ) : connectionStatus === 'success' ? (
+                'Connected Successfully'
+              ) : (
+                'Connect to Gmail'
+              )}
             </button>
           </div>
         </div>

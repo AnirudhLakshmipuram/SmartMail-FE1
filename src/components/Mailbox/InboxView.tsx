@@ -24,6 +24,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { apiService } from '../../services/api';
 
 interface EmailMessage {
   id: string;
@@ -49,6 +50,7 @@ interface AIResponse {
   category: string;
   tone: string;
   reasoning: string;
+  responseId: string;
 }
 
 interface InboxViewProps {
@@ -67,6 +69,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showEmailList, setShowEmailList] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   // Check if mobile
   useEffect(() => {
@@ -79,73 +82,89 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Mock email data - in real implementation, this would come from Gmail API
+  // Load emails from API
   useEffect(() => {
-    const mockEmails: EmailMessage[] = [
-      {
-        id: '1',
-        from: 'customer@techcorp.com',
-        fromName: 'Sarah Johnson',
-        to: emailConfig.email,
-        subject: 'Urgent: Payment processing issue with invoice #INV-2024-001',
-        body: 'Hi there,\n\nWe\'re experiencing difficulties processing payment for invoice #INV-2024-001. The payment gateway is returning an error code 4001. Could you please help us resolve this issue as soon as possible?\n\nBest regards,\nSarah Johnson\nAccounts Payable\nTechCorp Solutions',
-        timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-        isRead: false,
-        isStarred: false,
-        hasAttachments: true,
-        priority: 'high',
-        category: 'Customer Support',
-        thread: [],
-        labels: ['billing', 'urgent']
-      },
-      {
-        id: '2',
-        from: 'marketing@startup.io',
-        fromName: 'Mike Chen',
-        to: emailConfig.email,
-        subject: 'Partnership opportunity - AI integration',
-        body: 'Hello,\n\nI hope this email finds you well. We\'re reaching out regarding a potential partnership opportunity. Our startup specializes in AI-powered customer service solutions, and we believe there could be great synergy between our companies.\n\nWould you be available for a brief call next week to discuss this further?\n\nBest,\nMike Chen\nBusiness Development\nStartup.io',
-        timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-        isRead: true,
-        isStarred: true,
-        hasAttachments: false,
-        priority: 'normal',
-        category: 'Business Development',
-        thread: [],
-        labels: ['partnership', 'ai']
-      },
-      {
-        id: '3',
-        from: 'support@cloudservice.com',
-        fromName: 'CloudService Support',
-        to: emailConfig.email,
-        subject: 'Your monthly usage report is ready',
-        body: 'Dear valued customer,\n\nYour monthly usage report for December 2024 is now available in your dashboard. This month you used 85% of your allocated resources.\n\nKey highlights:\n- API calls: 45,230\n- Storage: 12.3 GB\n- Bandwidth: 156 GB\n\nThank you for choosing CloudService.\n\nBest regards,\nCloudService Team',
-        timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-        isRead: true,
-        isStarred: false,
-        hasAttachments: false,
-        priority: 'low',
-        category: 'Notifications',
-        thread: [],
-        labels: ['reports', 'monthly']
-      }
-    ];
-
-    setTimeout(() => {
-      setEmails(mockEmails);
-      setIsLoading(false);
-    }, 1000);
+    loadEmails();
   }, [emailConfig.email]);
+
+  const loadEmails = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiService.getEmails({
+        filter: filterBy === 'all' ? undefined : filterBy,
+        search: searchQuery || undefined,
+        limit: 50
+      });
+
+      if (response.success && response.data) {
+        // Transform API response to match our interface
+        const transformedEmails: EmailMessage[] = response.data.emails.map(email => ({
+          id: email.id,
+          from: email.from,
+          fromName: email.from.split('@')[0], // Extract name from email
+          to: email.to,
+          subject: email.subject,
+          body: email.body,
+          timestamp: email.receivedAt,
+          isRead: email.status !== 'pending',
+          isStarred: false, // Default value
+          hasAttachments: false, // Default value
+          priority: email.confidence > 0.8 ? 'high' : 'normal',
+          category: email.category,
+          thread: [],
+          labels: email.category ? [email.category] : []
+        }));
+
+        setEmails(transformedEmails);
+      } else {
+        console.error('Failed to load emails:', response.error);
+      }
+    } catch (error) {
+      console.error('Error loading emails:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const generateAIResponse = async (email: EmailMessage) => {
     setIsGeneratingAI(true);
     setShowAIPanel(true);
     
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock AI response based on email content
+    try {
+      const response = await apiService.generateAIResponse(email.id, {
+        tone: 'professional',
+        length: 'medium',
+        include_signature: true
+      });
+
+      if (response.success && response.data) {
+        const aiResponseData: AIResponse = {
+          suggestion: response.data.suggestion,
+          confidence: response.data.confidence,
+          category: response.data.category,
+          tone: response.data.tone,
+          reasoning: response.data.reasoning,
+          responseId: response.data.response_id
+        };
+        
+        setAiResponse(aiResponseData);
+        setReplyText(aiResponseData.suggestion);
+      } else {
+        console.error('Failed to generate AI response:', response.error);
+        // Fallback to mock response for demo
+        generateMockAIResponse(email);
+      }
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      // Fallback to mock response for demo
+      generateMockAIResponse(email);
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const generateMockAIResponse = (email: EmailMessage) => {
+    // Mock AI response for demo purposes
     let mockResponse: AIResponse;
     
     if (email.subject.toLowerCase().includes('payment') || email.subject.toLowerCase().includes('invoice')) {
@@ -154,29 +173,85 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
         confidence: 0.92,
         category: 'Customer Support',
         tone: 'Professional & Urgent',
-        reasoning: 'High confidence due to clear payment issue context. Used urgent but professional tone to match the customer\'s concern level.'
+        reasoning: 'High confidence due to clear payment issue context. Used urgent but professional tone to match the customer\'s concern level.',
+        responseId: 'mock_response_' + Date.now()
       };
     } else if (email.subject.toLowerCase().includes('partnership')) {
       mockResponse = {
-        suggestion: `Hi Mike,\n\nThank you for reaching out about the partnership opportunity. AI-powered customer service solutions are definitely an area of interest for us.\n\nI'd be happy to schedule a call next week to explore potential synergies between our companies. Could you share a bit more about your specific AI capabilities and what type of partnership structure you have in mind?\n\nI'm available Tuesday through Thursday next week, preferably in the afternoon. Please let me know what works best for your schedule.\n\nLooking forward to our conversation.\n\nBest regards,\n[Your Name]\nBusiness Development`,
+        suggestion: `Hi ${email.fromName},\n\nThank you for reaching out about the partnership opportunity. AI-powered customer service solutions are definitely an area of interest for us.\n\nI'd be happy to schedule a call next week to explore potential synergies between our companies. Could you share a bit more about your specific AI capabilities and what type of partnership structure you have in mind?\n\nI'm available Tuesday through Thursday next week, preferably in the afternoon. Please let me know what works best for your schedule.\n\nLooking forward to our conversation.\n\nBest regards,\n[Your Name]\nBusiness Development`,
         confidence: 0.87,
         category: 'Business Development',
         tone: 'Professional & Interested',
-        reasoning: 'Good confidence for partnership inquiry. Balanced professional tone showing interest while requesting more details.'
+        reasoning: 'Good confidence for partnership inquiry. Balanced professional tone showing interest while requesting more details.',
+        responseId: 'mock_response_' + Date.now()
       };
     } else {
       mockResponse = {
-        suggestion: `Dear CloudService Team,\n\nThank you for the monthly usage report. It's helpful to see the detailed breakdown of our resource consumption.\n\nI notice we're at 85% of our allocated resources. Could you please provide information about upgrading our plan or optimizing our current usage?\n\nBest regards,\n[Your Name]`,
+        suggestion: `Dear ${email.fromName},\n\nThank you for your email. I've received your message and will review it carefully.\n\nI'll get back to you within 24 hours with a detailed response. If this is urgent, please don't hesitate to call our support line.\n\nBest regards,\n[Your Name]`,
         confidence: 0.75,
         category: 'General',
         tone: 'Professional',
-        reasoning: 'Moderate confidence for general inquiry. Standard professional response acknowledging the report.'
+        reasoning: 'Moderate confidence for general inquiry. Standard professional response acknowledging the email.',
+        responseId: 'mock_response_' + Date.now()
       };
     }
     
     setAiResponse(mockResponse);
     setReplyText(mockResponse.suggestion);
-    setIsGeneratingAI(false);
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedEmail || !replyText.trim()) return;
+
+    setIsSendingReply(true);
+    try {
+      const response = await apiService.sendReply(selectedEmail.id, replyText);
+      
+      if (response.success) {
+        console.log('Reply sent successfully:', response.data);
+        // Reset the reply panel
+        setReplyText('');
+        setAiResponse(null);
+        setShowAIPanel(false);
+        // Refresh emails to show updated status
+        loadEmails();
+      } else {
+        console.error('Failed to send reply:', response.error);
+        alert('Failed to send reply. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      alert('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const handleEmailAction = async (emailId: string, action: 'read' | 'star' | 'archive' | 'delete') => {
+    try {
+      let response;
+      switch (action) {
+        case 'read':
+          response = await apiService.markEmailAsRead(emailId, true);
+          break;
+        case 'star':
+          response = await apiService.starEmail(emailId, true);
+          break;
+        case 'archive':
+          response = await apiService.archiveEmail(emailId);
+          break;
+        case 'delete':
+          response = await apiService.deleteEmail(emailId);
+          break;
+      }
+
+      if (response?.success) {
+        // Refresh emails to show updated status
+        loadEmails();
+      }
+    } catch (error) {
+      console.error(`Error performing ${action} action:`, error);
+    }
   };
 
   const filteredEmails = emails.filter(email => {
@@ -213,20 +288,14 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
     }
   };
 
-  const handleSendReply = () => {
-    // In real implementation, this would send the email via Gmail API
-    console.log('Sending reply:', replyText);
-    // Reset the reply panel
-    setReplyText('');
-    setAiResponse(null);
-    setShowAIPanel(false);
-    // Update email status, add to logs, etc.
-  };
-
   const handleEmailSelect = (email: EmailMessage) => {
     setSelectedEmail(email);
     if (isMobile) {
       setShowEmailList(false);
+    }
+    // Mark as read when selected
+    if (!email.isRead) {
+      handleEmailAction(email.id, 'read');
     }
   };
 
@@ -257,8 +326,12 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
                 placeholder="Search emails..."
               />
             </div>
-            <button className="p-2 text-gray-400 hover:text-blue-500 transition-colors">
-              <RefreshCw className="h-4 w-4" />
+            <button 
+              onClick={loadEmails}
+              disabled={isLoading}
+              className="p-2 text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
           
@@ -298,7 +371,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-semibold flex-shrink-0">
-                        {email.fromName.charAt(0)}
+                        {email.fromName.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm truncate ${!email.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
@@ -379,13 +452,22 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                  <button className="p-2 text-gray-400 hover:text-yellow-500 transition-colors">
+                  <button 
+                    onClick={() => handleEmailAction(selectedEmail.id, 'star')}
+                    className="p-2 text-gray-400 hover:text-yellow-500 transition-colors"
+                  >
                     <Star className={`h-4 w-4 sm:h-5 sm:w-5 ${selectedEmail.isStarred ? 'text-yellow-500 fill-current' : ''}`} />
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                  <button 
+                    onClick={() => handleEmailAction(selectedEmail.id, 'archive')}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
                     <Archive className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                  <button 
+                    onClick={() => handleEmailAction(selectedEmail.id, 'delete')}
+                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                  >
                     <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                   <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
@@ -513,10 +595,20 @@ export const InboxView: React.FC<InboxViewProps> = ({ emailConfig }) => {
                         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                           <button
                             onClick={handleSendReply}
-                            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                            disabled={isSendingReply || !replyText.trim()}
+                            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 text-sm"
                           >
-                            <Send className="h-4 w-4" />
-                            <span>Send Reply</span>
+                            {isSendingReply ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Sending...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4" />
+                                <span>Send Reply</span>
+                              </>
+                            )}
                           </button>
                           <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
                             <Edit className="h-4 w-4" />

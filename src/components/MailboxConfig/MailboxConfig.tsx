@@ -3,13 +3,41 @@ import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorMessage } from '../common/ErrorMessage';
-import { Settings, Plus, Trash2, Mail, Sliders, Save, AlertCircle, CheckCircle, Target, X, RefreshCw } from 'lucide-react';
+import { 
+  Settings, 
+  Plus, 
+  Trash2, 
+  Mail, 
+  Sliders, 
+  Save, 
+  AlertCircle, 
+  CheckCircle, 
+  Target, 
+  X, 
+  RefreshCw,
+  Toggle,
+  Clock,
+  Calendar
+} from 'lucide-react';
 import { MailboxConfig as MailboxConfigType } from '../../types';
+import { apiService } from '../../services/api';
 
 interface AutoReplyRule {
   id: string;
   email: string;
   enabled: boolean;
+  categories: string[];
+  confidenceThreshold: number;
+  keywords: string[];
+  schedule: {
+    enabled: boolean;
+    timezone: string;
+    businessHours: {
+      start: string;
+      end: string;
+      days: string[];
+    };
+  };
 }
 
 interface CategoryConfig {
@@ -24,44 +52,27 @@ export const MailboxConfig: React.FC = () => {
   const { categories, mailboxConfig, loading, error, updateMailboxConfig, loadPageData } = useApp();
   
   const [config, setConfig] = useState<MailboxConfigType>({
-    email: mailboxConfig?.email || '',
-    appPassword: mailboxConfig?.appPassword || '',
-    autoReplyEmails: mailboxConfig?.autoReplyEmails || [],
-    confidenceThreshold: mailboxConfig?.confidenceThreshold || 0.8,
-    enabled: mailboxConfig?.enabled || false
+    email: '',
+    appPassword: '',
+    autoReplyEmails: [],
+    confidenceThreshold: 0.8,
+    enabled: false
   });
 
-  const [autoReplyRules, setAutoReplyRules] = useState<AutoReplyRule[]>([
-    { id: '1', email: 'support@company.com', enabled: true },
-    { id: '2', email: 'sales@company.com', enabled: false },
-  ]);
-
+  const [autoReplyRules, setAutoReplyRules] = useState<AutoReplyRule[]>([]);
   const [categoryConfigs, setCategoryConfigs] = useState<CategoryConfig[]>([]);
-
   const [newEmail, setNewEmail] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Load mailbox config page data when component mounts
   useEffect(() => {
     console.log('⚙️ Mailbox Config page mounted - loading categories and config');
     loadPageData('mailbox-config');
+    loadAutoReplyRules();
   }, []);
-
-  // Update category configs when categories are loaded
-  useEffect(() => {
-    if (categories.length > 0) {
-      setCategoryConfigs(
-        categories.map(cat => ({
-          id: cat.id,
-          name: cat.name,
-          enabled: true,
-          keywords: ['billing', 'payment', 'invoice'],
-          template: cat.template
-        }))
-      );
-    }
-  }, [categories]);
 
   // Update config when mailboxConfig is loaded
   useEffect(() => {
@@ -76,34 +87,130 @@ export const MailboxConfig: React.FC = () => {
     }
   }, [mailboxConfig]);
 
+  // Update category configs when categories are loaded
+  useEffect(() => {
+    if (categories.length > 0) {
+      setCategoryConfigs(
+        categories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          enabled: true,
+          keywords: ['billing', 'payment', 'invoice'], // Default keywords
+          template: cat.template
+        }))
+      );
+    }
+  }, [categories]);
+
+  const loadAutoReplyRules = async () => {
+    try {
+      const response = await apiService.getAutoReplyRules();
+      if (response.success && response.data) {
+        setAutoReplyRules(response.data.map(rule => ({
+          ...rule,
+          schedule: {
+            ...rule.schedule,
+            businessHours: {
+              ...rule.schedule.business_hours,
+              start: rule.schedule.business_hours.start,
+              end: rule.schedule.business_hours.end,
+              days: rule.schedule.business_hours.days
+            }
+          }
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load auto-reply rules:', error);
+    }
+  };
+
   const handleSaveConfig = async () => {
-    const success = await updateMailboxConfig(config);
-    if (success) {
-      // Show success message
-      console.log('✅ Mailbox configuration saved successfully');
+    setIsSaving(true);
+    setSaveMessage(null);
+    
+    try {
+      const success = await updateMailboxConfig(config);
+      if (success) {
+        setSaveMessage({ type: 'success', message: 'Configuration saved successfully!' });
+        console.log('✅ Mailbox configuration saved successfully');
+      } else {
+        setSaveMessage({ type: 'error', message: 'Failed to save configuration. Please try again.' });
+      }
+    } catch (error) {
+      setSaveMessage({ type: 'error', message: 'Network error. Please check your connection.' });
+    } finally {
+      setIsSaving(false);
+      // Clear message after 3 seconds
+      setTimeout(() => setSaveMessage(null), 3000);
     }
   };
 
-  const addAutoReplyEmail = () => {
+  const addAutoReplyEmail = async () => {
     if (newEmail && !autoReplyRules.find(rule => rule.email === newEmail)) {
-      const newRule: AutoReplyRule = {
-        id: Date.now().toString(),
-        email: newEmail,
-        enabled: true
-      };
-      setAutoReplyRules(prev => [...prev, newRule]);
-      setNewEmail('');
+      try {
+        const newRule = {
+          email_address: newEmail,
+          enabled: true,
+          categories: [],
+          confidence_threshold: 0.8,
+          keywords: [],
+          schedule: {
+            enabled: false,
+            timezone: 'UTC',
+            business_hours: {
+              start: '09:00',
+              end: '17:00',
+              days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            }
+          }
+        };
+
+        const response = await apiService.createAutoReplyRule(newRule);
+        if (response.success && response.data) {
+          setAutoReplyRules(prev => [...prev, {
+            ...response.data,
+            schedule: {
+              ...response.data.schedule,
+              businessHours: {
+                start: response.data.schedule.business_hours.start,
+                end: response.data.schedule.business_hours.end,
+                days: response.data.schedule.business_hours.days
+              }
+            }
+          }]);
+          setNewEmail('');
+        }
+      } catch (error) {
+        console.error('Failed to create auto-reply rule:', error);
+      }
     }
   };
 
-  const removeAutoReplyEmail = (id: string) => {
-    setAutoReplyRules(prev => prev.filter(rule => rule.id !== id));
+  const removeAutoReplyEmail = async (id: string) => {
+    try {
+      const response = await apiService.deleteAutoReplyRule(id);
+      if (response.success) {
+        setAutoReplyRules(prev => prev.filter(rule => rule.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete auto-reply rule:', error);
+    }
   };
 
-  const toggleAutoReplyEmail = (id: string) => {
-    setAutoReplyRules(prev => prev.map(rule => 
-      rule.id === id ? { ...rule, enabled: !rule.enabled } : rule
-    ));
+  const toggleAutoReplyEmail = async (id: string) => {
+    const rule = autoReplyRules.find(r => r.id === id);
+    if (!rule) return;
+
+    try {
+      const response = await apiService.toggleAutoReplyRule(id, !rule.enabled);
+      if (response.success && response.data) {
+        setAutoReplyRules(prev => prev.map(r => 
+          r.id === id ? { ...response.data, schedule: { ...response.data.schedule, businessHours: { ...response.data.schedule.business_hours } } } : r
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to toggle auto-reply rule:', error);
+    }
   };
 
   const addKeyword = (categoryId: string) => {
@@ -171,6 +278,24 @@ export const MailboxConfig: React.FC = () => {
             <span>Refresh</span>
           </button>
         </div>
+
+        {/* Save Message */}
+        {saveMessage && (
+          <div className={`p-4 rounded-lg border ${
+            saveMessage.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center">
+              {saveMessage.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 mr-2" />
+              ) : (
+                <AlertCircle className="h-5 w-5 mr-2" />
+              )}
+              {saveMessage.message}
+            </div>
+          </div>
+        )}
 
         {/* Global Settings */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -271,12 +396,22 @@ export const MailboxConfig: React.FC = () => {
               <div key={rule.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Mail className="h-5 w-5 text-gray-400" />
-                  <span className="font-medium text-gray-900">{rule.email}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    rule.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {rule.enabled ? 'Active' : 'Inactive'}
-                  </span>
+                  <div>
+                    <span className="font-medium text-gray-900">{rule.email}</span>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        rule.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {rule.enabled ? 'Active' : 'Inactive'}
+                      </span>
+                      {rule.schedule.enabled && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Scheduled
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -401,10 +536,20 @@ export const MailboxConfig: React.FC = () => {
         <div className="flex justify-end">
           <button
             onClick={handleSaveConfig}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 font-medium"
+            disabled={isSaving}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 font-medium"
           >
-            <Save className="h-5 w-5" />
-            <span>Save Configuration</span>
+            {isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                <span>Save Configuration</span>
+              </>
+            )}
           </button>
         </div>
       </div>
