@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Category, CompanyDocument, Email, MailboxConfig, LogEntry } from '../types';
+import { apiService } from '../services/api';
+import { useApi } from '../hooks/useApi';
 
 interface AppContextType {
   categories: Category[];
@@ -7,14 +9,27 @@ interface AppContextType {
   emails: Email[];
   mailboxConfig: MailboxConfig | null;
   logs: LogEntry[];
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
-  addDocument: (document: Omit<CompanyDocument, 'id'>) => void;
-  updateMailboxConfig: (config: MailboxConfig) => void;
-  addEmail: (email: Omit<Email, 'id'>) => void;
-  updateEmail: (id: string, email: Partial<Email>) => void;
-  addLog: (log: Omit<LogEntry, 'id'>) => void;
+  loading: {
+    categories: boolean;
+    documents: boolean;
+    emails: boolean;
+    mailboxConfig: boolean;
+    logs: boolean;
+  };
+  error: {
+    categories: string | null;
+    documents: string | null;
+    emails: string | null;
+    mailboxConfig: string | null;
+    logs: string | null;
+  };
+  addCategory: (category: Omit<Category, 'id'>) => Promise<boolean>;
+  updateCategory: (id: string, category: Partial<Category>) => Promise<boolean>;
+  deleteCategory: (id: string) => Promise<boolean>;
+  addDocument: (file: File, categories: string[]) => Promise<boolean>;
+  deleteDocument: (id: string) => Promise<boolean>;
+  updateMailboxConfig: (config: MailboxConfig) => Promise<boolean>;
+  refreshData: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -28,88 +43,110 @@ export const useApp = () => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: '1',
-      name: 'Marketing',
-      description: 'Marketing and promotional inquiries',
-      tone: 'friendly',
-      template: 'Thank you for your interest in our services. We\'ll get back to you soon!',
-      color: 'bg-blue-500'
-    },
-    {
-      id: '2',
-      name: 'Customer Care',
-      description: 'Customer support and service requests',
-      tone: 'professional',
-      template: 'Thank you for contacting our support team. We\'re here to help!',
-      color: 'bg-green-500'
-    }
-  ]);
-
+  const [categories, setCategories] = useState<Category[]>([]);
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
-  const [emails, setEmails] = useState<Email[]>([
-    {
-      id: '1',
-      from: 'customer@example.com',
-      to: 'support@company.com',
-      subject: 'Question about your services',
-      body: 'Hi, I\'m interested in learning more about your pricing and packages.',
-      receivedAt: new Date(Date.now() - 3600000),
-      category: 'Marketing',
-      replySuggestion: 'Thank you for your interest! I\'d be happy to share our pricing information with you.',
-      confidence: 0.85,
-      status: 'pending'
-    }
-  ]);
-
+  const [emails, setEmails] = useState<Email[]>([]);
   const [mailboxConfig, setMailboxConfig] = useState<MailboxConfig | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([
-    {
-      id: '1',
-      timestamp: new Date(Date.now() - 1800000),
-      type: 'pending',
-      email: 'customer@example.com',
-      subject: 'Question about your services',
-      confidence: 0.85,
-      action: 'AI suggestion generated'
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  // API hooks for data fetching
+  const categoriesApi = useApi(() => apiService.getCategories());
+  const documentsApi = useApi(() => apiService.getDocuments());
+  const emailsApi = useApi(() => apiService.getEmails());
+  const mailboxConfigApi = useApi(() => apiService.getMailboxConfig());
+  const logsApi = useApi(() => apiService.getLogs());
+
+  // Update state when API data changes
+  useEffect(() => {
+    if (categoriesApi.data) {
+      setCategories(categoriesApi.data);
     }
-  ]);
+  }, [categoriesApi.data]);
 
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory = { ...category, id: Date.now().toString() };
-    setCategories(prev => [...prev, newCategory]);
+  useEffect(() => {
+    if (documentsApi.data) {
+      setDocuments(documentsApi.data);
+    }
+  }, [documentsApi.data]);
+
+  useEffect(() => {
+    if (emailsApi.data) {
+      setEmails(emailsApi.data.emails);
+    }
+  }, [emailsApi.data]);
+
+  useEffect(() => {
+    if (mailboxConfigApi.data) {
+      setMailboxConfig(mailboxConfigApi.data);
+    }
+  }, [mailboxConfigApi.data]);
+
+  useEffect(() => {
+    if (logsApi.data) {
+      setLogs(logsApi.data.logs);
+    }
+  }, [logsApi.data]);
+
+  const addCategory = async (category: Omit<Category, 'id'>): Promise<boolean> => {
+    const response = await apiService.createCategory(category);
+    if (response.success && response.data) {
+      setCategories(prev => [...prev, response.data!]);
+      return true;
+    }
+    return false;
   };
 
-  const updateCategory = (id: string, updates: Partial<Category>) => {
-    setCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat));
+  const updateCategory = async (id: string, updates: Partial<Category>): Promise<boolean> => {
+    const response = await apiService.updateCategory(id, updates);
+    if (response.success && response.data) {
+      setCategories(prev => prev.map(cat => cat.id === id ? response.data! : cat));
+      return true;
+    }
+    return false;
   };
 
-  const deleteCategory = (id: string) => {
-    setCategories(prev => prev.filter(cat => cat.id !== id));
+  const deleteCategory = async (id: string): Promise<boolean> => {
+    const response = await apiService.deleteCategory(id);
+    if (response.success) {
+      setCategories(prev => prev.filter(cat => cat.id !== id));
+      return true;
+    }
+    return false;
   };
 
-  const addDocument = (document: Omit<CompanyDocument, 'id'>) => {
-    const newDocument = { ...document, id: Date.now().toString() };
-    setDocuments(prev => [...prev, newDocument]);
+  const addDocument = async (file: File, categories: string[]): Promise<boolean> => {
+    const response = await apiService.uploadDocument(file, categories);
+    if (response.success && response.data) {
+      setDocuments(prev => [...prev, response.data!]);
+      return true;
+    }
+    return false;
   };
 
-  const updateMailboxConfig = (config: MailboxConfig) => {
-    setMailboxConfig(config);
+  const deleteDocument = async (id: string): Promise<boolean> => {
+    const response = await apiService.deleteDocument(id);
+    if (response.success) {
+      setDocuments(prev => prev.filter(doc => doc.id !== id));
+      return true;
+    }
+    return false;
   };
 
-  const addEmail = (email: Omit<Email, 'id'>) => {
-    const newEmail = { ...email, id: Date.now().toString() };
-    setEmails(prev => [...prev, newEmail]);
+  const updateMailboxConfig = async (config: MailboxConfig): Promise<boolean> => {
+    const response = await apiService.updateMailboxConfig(config);
+    if (response.success && response.data) {
+      setMailboxConfig(response.data);
+      return true;
+    }
+    return false;
   };
 
-  const updateEmail = (id: string, updates: Partial<Email>) => {
-    setEmails(prev => prev.map(email => email.id === id ? { ...email, ...updates } : email));
-  };
-
-  const addLog = (log: Omit<LogEntry, 'id'>) => {
-    const newLog = { ...log, id: Date.now().toString() };
-    setLogs(prev => [newLog, ...prev]);
+  const refreshData = () => {
+    categoriesApi.refetch();
+    documentsApi.refetch();
+    emailsApi.refetch();
+    mailboxConfigApi.refetch();
+    logsApi.refetch();
   };
 
   return (
@@ -119,14 +156,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       emails,
       mailboxConfig,
       logs,
+      loading: {
+        categories: categoriesApi.loading,
+        documents: documentsApi.loading,
+        emails: emailsApi.loading,
+        mailboxConfig: mailboxConfigApi.loading,
+        logs: logsApi.loading,
+      },
+      error: {
+        categories: categoriesApi.error,
+        documents: documentsApi.error,
+        emails: emailsApi.error,
+        mailboxConfig: mailboxConfigApi.error,
+        logs: logsApi.error,
+      },
       addCategory,
       updateCategory,
       deleteCategory,
       addDocument,
+      deleteDocument,
       updateMailboxConfig,
-      addEmail,
-      updateEmail,
-      addLog,
+      refreshData,
     }}>
       {children}
     </AppContext.Provider>
