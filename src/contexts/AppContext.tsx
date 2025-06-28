@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { Category, CompanyDocument, Email, MailboxConfig, LogEntry } from '../types';
 import { apiService } from '../services/api';
-import { useApi } from '../hooks/useApi';
 
 interface AppContextType {
   categories: Category[];
@@ -23,13 +22,22 @@ interface AppContextType {
     mailboxConfig: string | null;
     logs: string | null;
   };
+  // Manual trigger functions
+  loadCategories: () => Promise<void>;
+  loadDocuments: () => Promise<void>;
+  loadEmails: () => Promise<void>;
+  loadMailboxConfig: () => Promise<void>;
+  loadLogs: () => Promise<void>;
+  // CRUD operations
   addCategory: (category: Omit<Category, 'id'>) => Promise<boolean>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<boolean>;
   deleteCategory: (id: string) => Promise<boolean>;
   addDocument: (file: File, categories: string[]) => Promise<boolean>;
   deleteDocument: (id: string) => Promise<boolean>;
   updateMailboxConfig: (config: MailboxConfig) => Promise<boolean>;
+  // Utility functions
   refreshData: () => void;
+  clearData: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -49,44 +57,114 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mailboxConfig, setMailboxConfig] = useState<MailboxConfig | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  // API hooks for data fetching
-  const categoriesApi = useApi(() => apiService.getCategories());
-  const documentsApi = useApi(() => apiService.getDocuments());
-  const emailsApi = useApi(() => apiService.getEmails());
-  const mailboxConfigApi = useApi(() => apiService.getMailboxConfig());
-  const logsApi = useApi(() => apiService.getLogs());
+  const [loading, setLoading] = useState({
+    categories: false,
+    documents: false,
+    emails: false,
+    mailboxConfig: false,
+    logs: false,
+  });
 
-  // Update state when API data changes
-  useEffect(() => {
-    if (categoriesApi.data) {
-      setCategories(categoriesApi.data);
+  const [error, setError] = useState({
+    categories: null as string | null,
+    documents: null as string | null,
+    emails: null as string | null,
+    mailboxConfig: null as string | null,
+    logs: null as string | null,
+  });
+
+  // Manual data loading functions
+  const loadCategories = async () => {
+    setLoading(prev => ({ ...prev, categories: true }));
+    setError(prev => ({ ...prev, categories: null }));
+    
+    try {
+      const response = await apiService.getCategories();
+      if (response.success && response.data) {
+        setCategories(response.data);
+      } else {
+        setError(prev => ({ ...prev, categories: response.error || 'Failed to load categories' }));
+      }
+    } catch (err) {
+      setError(prev => ({ ...prev, categories: 'Network error while loading categories' }));
+    } finally {
+      setLoading(prev => ({ ...prev, categories: false }));
     }
-  }, [categoriesApi.data]);
+  };
 
-  useEffect(() => {
-    if (documentsApi.data) {
-      setDocuments(documentsApi.data);
+  const loadDocuments = async () => {
+    setLoading(prev => ({ ...prev, documents: true }));
+    setError(prev => ({ ...prev, documents: null }));
+    
+    try {
+      const response = await apiService.getDocuments();
+      if (response.success && response.data) {
+        setDocuments(response.data);
+      } else {
+        setError(prev => ({ ...prev, documents: response.error || 'Failed to load documents' }));
+      }
+    } catch (err) {
+      setError(prev => ({ ...prev, documents: 'Network error while loading documents' }));
+    } finally {
+      setLoading(prev => ({ ...prev, documents: false }));
     }
-  }, [documentsApi.data]);
+  };
 
-  useEffect(() => {
-    if (emailsApi.data) {
-      setEmails(emailsApi.data.emails);
+  const loadEmails = async () => {
+    setLoading(prev => ({ ...prev, emails: true }));
+    setError(prev => ({ ...prev, emails: null }));
+    
+    try {
+      const response = await apiService.getEmails();
+      if (response.success && response.data) {
+        setEmails(response.data.emails);
+      } else {
+        setError(prev => ({ ...prev, emails: response.error || 'Failed to load emails' }));
+      }
+    } catch (err) {
+      setError(prev => ({ ...prev, emails: 'Network error while loading emails' }));
+    } finally {
+      setLoading(prev => ({ ...prev, emails: false }));
     }
-  }, [emailsApi.data]);
+  };
 
-  useEffect(() => {
-    if (mailboxConfigApi.data) {
-      setMailboxConfig(mailboxConfigApi.data);
+  const loadMailboxConfig = async () => {
+    setLoading(prev => ({ ...prev, mailboxConfig: true }));
+    setError(prev => ({ ...prev, mailboxConfig: null }));
+    
+    try {
+      const response = await apiService.getMailboxConfig();
+      if (response.success && response.data) {
+        setMailboxConfig(response.data);
+      } else {
+        setError(prev => ({ ...prev, mailboxConfig: response.error || 'Failed to load mailbox config' }));
+      }
+    } catch (err) {
+      setError(prev => ({ ...prev, mailboxConfig: 'Network error while loading mailbox config' }));
+    } finally {
+      setLoading(prev => ({ ...prev, mailboxConfig: false }));
     }
-  }, [mailboxConfigApi.data]);
+  };
 
-  useEffect(() => {
-    if (logsApi.data) {
-      setLogs(logsApi.data.logs);
+  const loadLogs = async () => {
+    setLoading(prev => ({ ...prev, logs: true }));
+    setError(prev => ({ ...prev, logs: null }));
+    
+    try {
+      const response = await apiService.getLogs();
+      if (response.success && response.data) {
+        setLogs(response.data.logs);
+      } else {
+        setError(prev => ({ ...prev, logs: response.error || 'Failed to load logs' }));
+      }
+    } catch (err) {
+      setError(prev => ({ ...prev, logs: 'Network error while loading logs' }));
+    } finally {
+      setLoading(prev => ({ ...prev, logs: false }));
     }
-  }, [logsApi.data]);
+  };
 
+  // CRUD operations
   const addCategory = async (category: Omit<Category, 'id'>): Promise<boolean> => {
     const response = await apiService.createCategory(category);
     if (response.success && response.data) {
@@ -141,12 +219,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  // Utility functions
   const refreshData = () => {
-    categoriesApi.refetch();
-    documentsApi.refetch();
-    emailsApi.refetch();
-    mailboxConfigApi.refetch();
-    logsApi.refetch();
+    loadCategories();
+    loadDocuments();
+    loadEmails();
+    loadMailboxConfig();
+    loadLogs();
+  };
+
+  const clearData = () => {
+    setCategories([]);
+    setDocuments([]);
+    setEmails([]);
+    setMailboxConfig(null);
+    setLogs([]);
+    setError({
+      categories: null,
+      documents: null,
+      emails: null,
+      mailboxConfig: null,
+      logs: null,
+    });
   };
 
   return (
@@ -156,20 +250,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       emails,
       mailboxConfig,
       logs,
-      loading: {
-        categories: categoriesApi.loading,
-        documents: documentsApi.loading,
-        emails: emailsApi.loading,
-        mailboxConfig: mailboxConfigApi.loading,
-        logs: logsApi.loading,
-      },
-      error: {
-        categories: categoriesApi.error,
-        documents: documentsApi.error,
-        emails: emailsApi.error,
-        mailboxConfig: mailboxConfigApi.error,
-        logs: logsApi.error,
-      },
+      loading,
+      error,
+      loadCategories,
+      loadDocuments,
+      loadEmails,
+      loadMailboxConfig,
+      loadLogs,
       addCategory,
       updateCategory,
       deleteCategory,
@@ -177,6 +264,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteDocument,
       updateMailboxConfig,
       refreshData,
+      clearData,
     }}>
       {children}
     </AppContext.Provider>

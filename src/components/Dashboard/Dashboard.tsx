@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -12,11 +12,32 @@ import {
   Clock,
   AlertTriangle,
   Bot,
-  RefreshCw
+  RefreshCw,
+  Play
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { emails, categories, documents, logs, loading, error, refreshData } = useApp();
+  const { 
+    emails, 
+    categories, 
+    documents, 
+    logs, 
+    loading, 
+    error, 
+    loadCategories,
+    loadDocuments,
+    loadEmails,
+    loadLogs,
+    refreshData 
+  } = useApp();
+
+  // Load initial data when component mounts
+  useEffect(() => {
+    loadCategories();
+    loadDocuments();
+    loadEmails();
+    loadLogs();
+  }, []);
 
   const stats = [
     {
@@ -56,7 +77,10 @@ export const Dashboard: React.FC = () => {
   const recentEmails = emails.slice(0, 5);
   const recentLogs = logs.slice(0, 5);
 
-  if (loading.emails || loading.categories || loading.documents || loading.logs) {
+  const isLoading = loading.emails || loading.categories || loading.documents || loading.logs;
+  const hasError = error.emails || error.categories || error.documents || error.logs;
+
+  if (isLoading && emails.length === 0 && categories.length === 0) {
     return (
       <Layout title="Dashboard" subtitle="Monitor your email automation performance">
         <div className="flex items-center justify-center h-64">
@@ -66,31 +90,54 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  if (error.emails || error.categories || error.documents || error.logs) {
-    const errorMessage = error.emails || error.categories || error.documents || error.logs;
-    return (
-      <Layout title="Dashboard" subtitle="Monitor your email automation performance">
-        <ErrorMessage 
-          message={errorMessage || 'Failed to load dashboard data'} 
-          onRetry={refreshData}
-        />
-      </Layout>
-    );
-  }
-
   return (
     <Layout title="Dashboard" subtitle="Monitor your email automation performance">
       <div className="space-y-4 sm:space-y-6">
-        {/* Refresh Button */}
-        <div className="flex justify-end">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <button
             onClick={refreshData}
-            className="flex items-center space-x-2 px-3 sm:px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={isLoading}
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh All Data</span>
+          </button>
+          
+          <button
+            onClick={loadEmails}
+            disabled={loading.emails}
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            <Play className="h-4 w-4" />
+            <span>Load Emails</span>
+          </button>
+          
+          <button
+            onClick={loadCategories}
+            disabled={loading.categories}
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+            <span>Load Categories</span>
           </button>
         </div>
+
+        {/* Error Messages */}
+        {hasError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+              <h3 className="text-sm font-medium text-red-800">API Errors Detected</h3>
+            </div>
+            <div className="text-sm text-red-700 space-y-1">
+              {error.emails && <p>• Emails: {error.emails}</p>}
+              {error.categories && <p>• Categories: {error.categories}</p>}
+              {error.documents && <p>• Documents: {error.documents}</p>}
+              {error.logs && <p>• Logs: {error.logs}</p>}
+            </div>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
@@ -126,11 +173,19 @@ export const Dashboard: React.FC = () => {
             <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent Emails</h3>
-                <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                <div className="flex items-center space-x-2">
+                  {loading.emails && <LoadingSpinner size="sm" />}
+                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                </div>
               </div>
             </div>
             <div className="p-4 sm:p-6">
-              {recentEmails.length > 0 ? (
+              {error.emails ? (
+                <ErrorMessage 
+                  message={error.emails} 
+                  onRetry={loadEmails}
+                />
+              ) : recentEmails.length > 0 ? (
                 <div className="space-y-3 sm:space-y-4">
                   {recentEmails.map((email) => (
                     <div key={email.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -166,7 +221,13 @@ export const Dashboard: React.FC = () => {
               ) : (
                 <div className="text-center py-6 sm:py-8">
                   <Mail className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 text-sm sm:text-base">No emails yet</p>
+                  <p className="text-gray-500 text-sm sm:text-base">No emails loaded</p>
+                  <button
+                    onClick={loadEmails}
+                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
+                  >
+                    Click to load emails
+                  </button>
                 </div>
               )}
             </div>
@@ -177,11 +238,19 @@ export const Dashboard: React.FC = () => {
             <div className="p-4 sm:p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">Activity Logs</h3>
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                <div className="flex items-center space-x-2">
+                  {loading.logs && <LoadingSpinner size="sm" />}
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                </div>
               </div>
             </div>
             <div className="p-4 sm:p-6">
-              {recentLogs.length > 0 ? (
+              {error.logs ? (
+                <ErrorMessage 
+                  message={error.logs} 
+                  onRetry={loadLogs}
+                />
+              ) : recentLogs.length > 0 ? (
                 <div className="space-y-3 sm:space-y-4">
                   {recentLogs.map((log) => (
                     <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
@@ -218,7 +287,13 @@ export const Dashboard: React.FC = () => {
               ) : (
                 <div className="text-center py-6 sm:py-8">
                   <FileText className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 text-sm sm:text-base">No activity yet</p>
+                  <p className="text-gray-500 text-sm sm:text-base">No logs loaded</p>
+                  <button
+                    onClick={loadLogs}
+                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
+                  >
+                    Click to load logs
+                  </button>
                 </div>
               )}
             </div>
@@ -229,20 +304,32 @@ export const Dashboard: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <button className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all group text-left">
+            <button 
+              onClick={loadCategories}
+              disabled={loading.categories}
+              className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all group text-left disabled:opacity-50"
+            >
               <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Add Category</p>
-              <p className="text-xs sm:text-sm text-gray-500">Create new email categories</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Categories</p>
+              <p className="text-xs sm:text-sm text-gray-500">Fetch email categories from API</p>
             </button>
-            <button className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all group text-left">
+            <button 
+              onClick={loadDocuments}
+              disabled={loading.documents}
+              className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all group text-left disabled:opacity-50"
+            >
               <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Upload Documents</p>
-              <p className="text-xs sm:text-sm text-gray-500">Add company knowledge base</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Documents</p>
+              <p className="text-xs sm:text-sm text-gray-500">Fetch uploaded documents from API</p>
             </button>
-            <button className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all group text-left sm:col-span-2 lg:col-span-1">
+            <button 
+              onClick={loadEmails}
+              disabled={loading.emails}
+              className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all group text-left sm:col-span-2 lg:col-span-1 disabled:opacity-50"
+            >
               <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 mb-2 group-hover:scale-110 transition-transform" />
-              <p className="font-medium text-gray-900 text-sm sm:text-base">Configure Mailbox</p>
-              <p className="text-xs sm:text-sm text-gray-500">Set up email integration</p>
+              <p className="font-medium text-gray-900 text-sm sm:text-base">Load Emails</p>
+              <p className="text-xs sm:text-sm text-gray-500">Fetch emails from mailbox API</p>
             </button>
           </div>
         </div>

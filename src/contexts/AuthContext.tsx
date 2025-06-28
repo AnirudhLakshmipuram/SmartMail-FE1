@@ -21,14 +21,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Demo credentials for testing
-const DEMO_CREDENTIALS = [
-  { email: 'demo@company.com', password: 'demo123', name: 'Demo User', domain: 'company.com' },
-  { email: 'admin@company.com', password: 'admin123', name: 'Admin User', domain: 'company.com' },
-  { email: 'test@example.com', password: 'test123', name: 'Test User', domain: 'example.com' },
-  { email: 'user@demo.com', password: 'password', name: 'Sample User', domain: 'demo.com' },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,56 +32,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const token = localStorage.getItem('access_token');
     
     if (savedUser && token) {
-      setUser(JSON.parse(savedUser));
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+      } catch (err) {
+        // Invalid saved user data, clear it
+        localStorage.removeItem('user');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      }
     }
     setIsLoading(false);
   }, []);
-
-  const demoLogin = (email: string, password: string): { success: boolean; user?: User } => {
-    const demoUser = DEMO_CREDENTIALS.find(
-      cred => cred.email === email && cred.password === password
-    );
-
-    if (demoUser) {
-      const user: User = {
-        id: Date.now().toString(),
-        email: demoUser.email,
-        name: demoUser.name,
-        domain: demoUser.domain,
-      };
-      
-      // Create a mock token
-      const mockToken = btoa(JSON.stringify({ userId: user.id, email: user.email }));
-      localStorage.setItem('access_token', mockToken);
-      localStorage.setItem('refresh_token', mockToken);
-      
-      return { success: true, user };
-    }
-
-    // Also allow any email with password length >= 6 (original demo behavior)
-    if (password.length >= 6) {
-      const user: User = {
-        id: Date.now().toString(),
-        email,
-        name: email.split('@')[0],
-      };
-      
-      const mockToken = btoa(JSON.stringify({ userId: user.id, email: user.email }));
-      localStorage.setItem('access_token', mockToken);
-      localStorage.setItem('refresh_token', mockToken);
-      
-      return { success: true, user };
-    }
-
-    return { success: false };
-  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // First try the real API
       const response = await apiService.login(email, password);
       
       if (response.success && response.user) {
@@ -97,32 +57,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('user', JSON.stringify(response.user));
         return true;
       } else {
-        // If API fails, try demo login
-        console.log('API login failed, trying demo credentials...');
-        const demoResult = demoLogin(email, password);
-        
-        if (demoResult.success && demoResult.user) {
-          setUser(demoResult.user);
-          localStorage.setItem('user', JSON.stringify(demoResult.user));
-          return true;
-        } else {
-          setError('Invalid credentials. Try demo@company.com / demo123');
-          return false;
-        }
-      }
-    } catch (error) {
-      console.log('Network error, trying demo credentials...');
-      // If network error, try demo login
-      const demoResult = demoLogin(email, password);
-      
-      if (demoResult.success && demoResult.user) {
-        setUser(demoResult.user);
-        localStorage.setItem('user', JSON.stringify(demoResult.user));
-        return true;
-      } else {
-        setError('Network error. Try demo@company.com / demo123');
+        setError(response.error || 'Login failed');
         return false;
       }
+    } catch (error) {
+      setError('Network error - please check your connection');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // First try the real API
       const response = await apiService.register(email, password, name, domain);
       
       if (response.success && response.user) {
@@ -141,50 +80,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('user', JSON.stringify(response.user));
         return true;
       } else {
-        // If API fails, create demo user
-        console.log('API registration failed, creating demo user...');
-        if (password.length >= 6) {
-          const user: User = {
-            id: Date.now().toString(),
-            email,
-            name,
-            domain,
-          };
-          
-          const mockToken = btoa(JSON.stringify({ userId: user.id, email: user.email }));
-          localStorage.setItem('access_token', mockToken);
-          localStorage.setItem('refresh_token', mockToken);
-          
-          setUser(user);
-          localStorage.setItem('user', JSON.stringify(user));
-          return true;
-        } else {
-          setError('Password must be at least 6 characters');
-          return false;
-        }
-      }
-    } catch (error) {
-      console.log('Network error, creating demo user...');
-      // If network error, create demo user
-      if (password.length >= 6) {
-        const user: User = {
-          id: Date.now().toString(),
-          email,
-          name,
-          domain,
-        };
-        
-        const mockToken = btoa(JSON.stringify({ userId: user.id, email: user.email }));
-        localStorage.setItem('access_token', mockToken);
-        localStorage.setItem('refresh_token', mockToken);
-        
-        setUser(user);
-        localStorage.setItem('user', JSON.stringify(user));
-        return true;
-      } else {
-        setError('Password must be at least 6 characters');
+        setError(response.error || 'Registration failed');
         return false;
       }
+    } catch (error) {
+      setError('Network error - please check your connection');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -196,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await apiService.logout();
     } catch (error) {
       // Ignore logout errors
+      console.error('Logout error:', error);
     } finally {
       setUser(null);
       localStorage.removeItem('user');

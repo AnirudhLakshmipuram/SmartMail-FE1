@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface UseApiState<T> {
   data: T | null;
@@ -6,21 +6,16 @@ interface UseApiState<T> {
   error: string | null;
 }
 
-interface UseApiOptions {
-  immediate?: boolean;
-}
-
-export function useApi<T>(
-  apiCall: () => Promise<{ success: boolean; data?: T; error?: string }>,
-  options: UseApiOptions = { immediate: true }
-) {
+export function useApi<T>() {
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
-    loading: options.immediate || false,
+    loading: false,
     error: null,
   });
 
-  const execute = async () => {
+  const execute = async (
+    apiCall: () => Promise<{ success: boolean; data?: T; error?: string }>
+  ) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
@@ -28,21 +23,21 @@ export function useApi<T>(
       
       if (response.success && response.data) {
         setState({ data: response.data, loading: false, error: null });
+        return response.data;
       } else {
         setState({ data: null, loading: false, error: response.error || 'Unknown error' });
+        return null;
       }
     } catch (error) {
-      setState({ data: null, loading: false, error: 'Network error' });
+      const errorMessage = error instanceof Error ? error.message : 'Network error';
+      setState({ data: null, loading: false, error: errorMessage });
+      return null;
     }
   };
 
-  useEffect(() => {
-    if (options.immediate) {
-      execute();
-    }
-  }, []);
+  const reset = () => {
+    setState({ data: null, loading: false, error: null });
+  };
 
-  const refetch = () => execute();
-
-  return { ...state, refetch, execute };
+  return { ...state, execute, reset };
 }

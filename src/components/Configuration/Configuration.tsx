@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '../Layout/Layout';
 import { useApp } from '../../contexts/AppContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -12,12 +12,14 @@ import {
   Palette,
   FileText,
   Save,
-  X
+  X,
+  RefreshCw,
+  Play
 } from 'lucide-react';
 import { Category } from '../../types';
 
 export const Configuration: React.FC = () => {
-  const { categories, loading, error, addCategory, updateCategory, deleteCategory, refreshData } = useApp();
+  const { categories, loading, error, addCategory, updateCategory, deleteCategory, loadCategories } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,6 +31,11 @@ export const Configuration: React.FC = () => {
     customPrompt: '',
     color: 'bg-blue-500',
   });
+
+  // Load categories when component mounts
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
   const toneOptions = [
     { value: 'professional', label: 'Professional', description: 'Formal and business-like' },
@@ -102,110 +109,125 @@ export const Configuration: React.FC = () => {
     }
   };
 
-  if (loading.categories) {
-    return (
-      <Layout title="Configuration" subtitle="Manage categories, tones, and templates">
-        <div className="flex items-center justify-center h-64">
-          <LoadingSpinner size="lg" text="Loading categories..." />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error.categories) {
-    return (
-      <Layout title="Configuration" subtitle="Manage categories, tones, and templates">
-        <ErrorMessage 
-          message={error.categories} 
-          onRetry={refreshData}
-        />
-      </Layout>
-    );
-  }
-
   return (
     <Layout title="Configuration" subtitle="Manage categories, tones, and templates">
       <div className="space-y-4 sm:space-y-6">
-        {/* Header with Add Button */}
+        {/* Header with Action Buttons */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Email Categories</h2>
             <p className="text-sm sm:text-base text-gray-600">Configure how AI responds to different types of emails</p>
           </div>
-          <button
-            onClick={() => openModal()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm sm:text-base"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Category</span>
-          </button>
-        </div>
-
-        {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-          {categories.map((category) => (
-            <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`${category.color} p-2 sm:p-3 rounded-lg flex-shrink-0`}>
-                    <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                  <div className="flex space-x-1 sm:space-x-2">
-                    <button
-                      onClick={() => openModal(category)}
-                      className="p-1 sm:p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(category.id)}
-                      className="p-1 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </button>
-                  </div>
-                </div>
-                
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 truncate">{category.name}</h3>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{category.description}</p>
-                
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-center text-sm">
-                    <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 flex-shrink-0" />
-                    <span className="text-gray-600">Tone: </span>
-                    <span className="ml-1 font-medium capitalize">{category.tone}</span>
-                  </div>
-                  
-                  {category.customPrompt && (
-                    <div className="flex items-start text-sm">
-                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-600">Custom prompt configured</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs font-medium mb-2 text-gray-500">Template Preview:</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg line-clamp-3">
-                    {category.template}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {categories.length === 0 && (
-          <div className="text-center py-12">
-            <Settings className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No categories yet</h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-6">Create your first category to get started with AI email responses</p>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+            <button
+              onClick={loadCategories}
+              disabled={loading.categories}
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+            >
+              {loading.categories ? <LoadingSpinner size="sm" /> : <Play className="h-4 w-4" />}
+              <span>Load Categories</span>
+            </button>
             <button
               onClick={() => openModal()}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
             >
-              Create Category
+              <Plus className="h-4 w-4" />
+              <span>Add Category</span>
             </button>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error.categories && (
+          <ErrorMessage 
+            message={error.categories} 
+            onRetry={loadCategories}
+          />
+        )}
+
+        {/* Loading State */}
+        {loading.categories && categories.length === 0 && (
+          <div className="flex items-center justify-center h-64">
+            <LoadingSpinner size="lg" text="Loading categories..." />
+          </div>
+        )}
+
+        {/* Categories Grid */}
+        {!loading.categories || categories.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+            {categories.map((category) => (
+              <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                <div className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`${category.color} p-2 sm:p-3 rounded-lg flex-shrink-0`}>
+                      <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                    </div>
+                    <div className="flex space-x-1 sm:space-x-2">
+                      <button
+                        onClick={() => openModal(category)}
+                        className="p-1 sm:p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(category.id)}
+                        className="p-1 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 truncate">{category.name}</h3>
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{category.description}</p>
+                  
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex items-center text-sm">
+                      <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 flex-shrink-0" />
+                      <span className="text-gray-600">Tone: </span>
+                      <span className="ml-1 font-medium capitalize">{category.tone}</span>
+                    </div>
+                    
+                    {category.customPrompt && (
+                      <div className="flex items-start text-sm">
+                        <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">Custom prompt configured</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs font-medium mb-2 text-gray-500">Template Preview:</p>
+                    <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg line-clamp-3">
+                      {category.template}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Empty State */}
+        {!loading.categories && categories.length === 0 && !error.categories && (
+          <div className="text-center py-12">
+            <Settings className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No categories loaded</h3>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">Load categories from the API or create your first category</p>
+            <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <button
+                onClick={loadCategories}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Load Categories
+              </button>
+              <button
+                onClick={() => openModal()}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Create Category
+              </button>
+            </div>
           </div>
         )}
       </div>
